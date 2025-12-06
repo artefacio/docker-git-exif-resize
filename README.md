@@ -1,9 +1,10 @@
 # docker-git-exif-resize
 This is a fork of [docker-git-pull-push](https://github.com/skwinnik/docker-git-pull-push), but with the added functionality of resizing images and scrubbing potentially sensitive EXIF data before uploading.
+
 *I am ***not*** a programmer, but can sometimes bash together bits of code until they work. This is the result of many hours of fumbling. It works for me, but please use this with caution and expect it to break.*
 
 ## Why make this?
-I use [Obsidian](https://obsidian.md/} along with [Quartz](https://quartz.jzhao.xyz/) for my website, and want to have any changes I make locally automatically update my site with minimal friction. The original git-push-pull was great for syncing, but didn't address 2 concerns I had about adding images to my content.
+I use [Obsidian](https://obsidian.md/) along with [Quartz](https://quartz.jzhao.xyz/) for my website, and want to have any changes I make locally automatically update my site with minimal friction. The original git-push-pull was great for syncing, but didn't address 2 concerns I had about adding images to my content.
 
 ### 1. EXIF metadata privacy
 If I embed a photo taken on my phone, I want to make sure the file doesn't include any personally identifying data. [Geotagged](https://en.wikipedia.org/wiki/Geotagging) GPS coordinates of my home, for example.
@@ -16,6 +17,7 @@ However, I might want larger images *sometimes*, so resizing is skipped if the f
 Crucially, both operations are done BEFORE committing or pushing the images, so that there should be no images in the commit history still containing sensitive data or unnecessarily using up your [repository limit](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits).
 
 ***PLEASE NOTE THAT THIS SCRIPT MODIFIES THE LOCAL IMAGES IN THE WORKING DIRECTORY***
+
 If you don't want to lose the original image size and exif data, *copy* images into the working directory, leaving the originals safely elsewhere.
 
 ## Setup
