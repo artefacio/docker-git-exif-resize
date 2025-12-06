@@ -10,6 +10,10 @@ set -e -x
 [ -z "${WORKING_DIR}" ] && { echo "Need to set WORKING_DIR"; exit 1; }
 [ -z "${FILES_TO_COMMIT}" ] && { echo "Need to set FILES_TO_COMMIT"; exit 1; }
 [ -z "${SLEEP_INTERVAL}" ] && { echo "Need to set SLEEP_INTERVAL"; exit 1; }
+[ -z "${SUPPORTED_FILES}" ] && { echo "Need to set SUPPORTED_FILES"; exit 1; }
+if [[ "${RESIZE_IMAGES}" == true ]]; then
+	[ -z "${IMAGE_SIZE_MAX}" ] && { echo "Need to set IMAGE_SIZE_MAX"; exit 1;}
+fi
 
 # Change to our working directory
 cd ${WORKING_DIR}
@@ -29,7 +33,7 @@ fi
 # git repository.
 if [ ! -d "${WORKING_DIR}/.git" ]; then
 	echo "Git repository not found. Initializing repository."
-	git init 
+	git init
 	git config --global --add safe.directory ${WORKING_DIR}
 	git config --global init.defaultBranch main
 	git remote add ${GIT_ORIGIN} ${GIT_REPO}
@@ -46,20 +50,40 @@ git config user.email "${COMMIT_EMAIL}"
 while true; do
 	# Sleep for the given interval.
 	sleep ${SLEEP_INTERVAL}
-	
+
 	# Reset our variable for checking whether or not changes were found.
 	CHANGES_FOUND=""
 
 	# Check to see if there are changes
-	CHANGES=`git status -s | awk {'print $2'}`
+	CHANGES=`git status -s | cut -c 4-`
 	if [ -z "${CHANGES}" ]; then
 		echo "No changes detected."
-		
 		#safely pull if no changes
 		git pull --rebase
-		chmod -R 777 .
 		continue
 	fi
+
+	#Loop through changed files and scrub EXIF
+	IFS=$'\n' # make newlines the only separator
+	for CHANGED_FILE in ${CHANGES}; do
+		CHANGED_FILE_EXT=`echo "${CHANGED_FILE##*.}" | tr '[:upper:]' '[:lower:]'` #extract file extension and convert to lowercase
+		if [[ -f ${CHANGED_FILE} ]]; then #check if file exists
+			if [[ ${SUPPORTED_FILES} == "*${CHANGED_FILE_EXT}*" ]]; then #check if filetype is supported
+				if [[ ${RESIZE_IMAGES} == true ]]; then #Check if resize is enabled
+					if [[ ${CHANGED_FILE} == "*_hires." ]]; then #check if tagged hires
+						echo "Image tagged as hires. Skipping resize."
+					else
+						magick ${CHANGED_FILE} -resize ${IMAGE_SIZE_MAX}x${IMAGE_SIZE_MAX}\> ${CHANGED_FILE} #Resize image
+					fi
+				fi
+				exiftool -all= -P --icc_profile:all -overwrite_original -tagsfromfile @ -Orientation -colorspacetags ${CHANGED_FILE}	#Remove EXIF data
+			else
+				echo "Filetype not supported for resize and EXIF removal:" ${CHANGED_FILE}
+			fi
+		else
+			echo "File doesn't exist anymore:" ${CHANGED_FILE}
+		fi
+	done
 
 	# Check to see if we need to commit all.
 	if [[ "${FILES_TO_COMMIT}" == "." ]]; then
@@ -81,10 +105,9 @@ while true; do
 	if [ ! -z "${CHANGES_FOUND}" ]; then
 		echo "Changes detected."
 		git commit -m "Update detected changes."
-		
+
 		#pull after commit
 		git pull --rebase
-		chmod -R 775 .
 		git push ${GIT_ORIGIN} ${GIT_BRANCH}
 	fi
 done
